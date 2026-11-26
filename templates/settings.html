@@ -1,0 +1,8 @@
+{% extends "base.html" %}{% block title %}Online Controls · PROJECT YT{% endblock %}{% block content %}
+<div class="eyebrow">SYSTEM CONFIGURATION</div><h1>Online Controls</h1><section class="card"><form method="post"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+<label class="check"><input type="checkbox" name="online_update" {{ 'checked' if online_update=='1' else '' }}> Enable update checks</label>
+<label class="check"><input type="checkbox" name="maintenance" {{ 'checked' if maintenance=='1' else '' }}> Enable maintenance mode (blocks license verification)</label>
+<label>Latest version</label><input name="latest_version" value="{{ latest_version }}">
+<label>Update download URL (HTTPS)</label><input name="update_url" value="{{ update_url }}">
+<label>Update message</label><textarea name="update_message" rows="3">{{ update_message }}</textarea>
+<button class="primary">Save settings</button></form></section>{% endblock %}

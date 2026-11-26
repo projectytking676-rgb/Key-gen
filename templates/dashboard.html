@@ -1,0 +1,7 @@
+{% extends "base.html" %}{% block title %}Overview · PROJECT YT{% endblock %}{% block content %}
+<div class="heading"><div><div class="eyebrow">CONTROL CENTER</div><h1>Overview</h1><p class="muted">License system status at a glance.</p></div><a class="primary button" href="{{ url_for('keys') }}">+ Generate keys</a></div>
+<div class="stats"><div class="stat"><span>Total keys</span><strong>{{ total }}</strong></div><div class="stat"><span>Active keys</span><strong>{{ active }}</strong></div><div class="stat"><span>Keys with devices</span><strong>{{ bound }}</strong></div><div class="stat"><span>Maintenance</span><strong class="{{ 'danger-text' if maintenance == '1' else 'success-text' }}">{{ 'ON' if maintenance == '1' else 'OFF' }}</strong></div></div>
+<section class="card"><div class="section-head"><h2>Recent licenses</h2><a href="{{ url_for('keys') }}">View all →</a></div>
+<div class="table-wrap"><table><thead><tr><th>License key</th><th>Status</th><th>Expiry</th><th>Device limit</th></tr></thead><tbody>
+{% for r in recent %}<tr><td class="mono">{{ r.license_key }}</td><td><span class="pill {{ 'green' if r.status=='active' else 'red' }}">{{ r.status }}</span></td><td>{{ r.expires_at or 'Lifetime' }}</td><td>{{ 'Unlimited' if r.device_limit==0 else r.device_limit }}</td></tr>{% else %}<tr><td colspan="4" class="muted">No keys generated yet.</td></tr>{% endfor %}
+</tbody></table></div></section>{% endblock %}
