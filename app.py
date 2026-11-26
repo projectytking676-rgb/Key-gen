@@ -10,9 +10,10 @@ from datetime import datetime, date, timedelta, timezone
 from functools import wraps
 from flask import (
     Flask, render_template, request, redirect, url_for,
-    session, flash, jsonify, abort, Response
+    session, flash, jsonify, abort, Response, send_from_directory
 )
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 
 
 # ============================================================
@@ -33,6 +34,9 @@ DB_DIR = os.path.dirname(os.path.abspath(DB_PATH))
 os.makedirs(DB_DIR, exist_ok=True)
 
 app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = 300 * 1024 * 1024  # 300 MB APK limit
+UPLOAD_DIR = os.environ.get("KURO_UPLOAD_PATH", os.path.join(APP_DIR, "uploads"))
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 app.secret_key = os.environ.get("KURO_SECRET_KEY")
 if not app.secret_key:
@@ -132,7 +136,12 @@ def init_db():
             "maintenance": "0",
             "latest_version": "1.0.0",
             "update_url": "",
-            "update_message": "A new version is available."
+            "update_message": "A new version is available.",
+            "update_force": "0",
+            "apk_filename": "",
+            "apk_original_name": "",
+            "apk_sha256": "",
+            "apk_size": "0"
         }
 
         for key, value in defaults.items():
@@ -781,17 +790,102 @@ def api_update():
     current = request.args.get("version", "").strip()
     latest = setting("latest_version")
     enabled = setting("online_update") == "1"
+    filename = setting("apk_filename")
+    uploaded_url = url_for("download_latest_apk", filename=filename, _external=True) if filename else ""
+    external_url = setting("update_url")
+    download_url = uploaded_url or external_url
+    available = bool(enabled and latest and current != latest and download_url)
 
     return jsonify(
+        ok=True,
         update_enabled=enabled,
-        update_available=bool(
-            enabled and latest and current != latest
-        ),
+        update_available=available,
+        force_update=setting("update_force") == "1" and available,
         current_version=current,
         latest_version=latest,
-        update_url=setting("update_url") if enabled else "",
+        update_url=download_url if enabled else "",
+        download_url=download_url if enabled else "",
         message=setting("update_message")
     )
+
+
+@app.get("/updates/apk/<filename>")
+def download_latest_apk(filename):
+    # Only the currently published APK is downloadable through this route.
+    current = setting("apk_filename")
+    if not current or filename != current:
+        abort(404)
+    return send_from_directory(UPLOAD_DIR, current, as_attachment=True,
+                               download_name=setting("apk_original_name") or "PROJECT_YT_update.apk",
+                               mimetype="application/vnd.android.package-archive")
+
+
+@app.route("/updates", methods=["GET", "POST"])
+@admin_required
+def updates():
+    if request.method == "POST":
+        version = request.form.get("latest_version", "").strip()[:40]
+        message = request.form.get("update_message", "").strip()[:1000]
+        force = "1" if request.form.get("force_update") == "1" else "0"
+        enabled = "1" if request.form.get("online_update") == "1" else "0"
+        uploaded = request.files.get("apk_file")
+        if not version:
+            flash("Version name is required.", "error")
+            return redirect(url_for("updates"))
+
+        new_filename = ""
+        original_name = ""
+        digest = ""
+        size = 0
+        if uploaded and uploaded.filename:
+            original_name = secure_filename(uploaded.filename) or "update.apk"
+            if not original_name.lower().endswith(".apk"):
+                flash("Only .apk files are allowed.", "error")
+                return redirect(url_for("updates"))
+            data = uploaded.read(300 * 1024 * 1024 + 1)
+            if len(data) > 300 * 1024 * 1024:
+                flash("APK is larger than 300 MB.", "error")
+                return redirect(url_for("updates"))
+            if len(data) < 4 or data[:2] != b"PK":
+                flash("Uploaded file does not look like a valid APK/ZIP package.", "error")
+                return redirect(url_for("updates"))
+            import hashlib
+            digest = hashlib.sha256(data).hexdigest()
+            size = len(data)
+            new_filename = secrets.token_hex(16) + ".apk"
+            temp_path = os.path.join(UPLOAD_DIR, new_filename + ".tmp")
+            with open(temp_path, "wb") as fh:
+                fh.write(data)
+            os.replace(temp_path, os.path.join(UPLOAD_DIR, new_filename))
+
+        # Keep existing uploaded APK if no new file was selected.
+        if not new_filename:
+            new_filename = setting("apk_filename")
+            original_name = setting("apk_original_name")
+            digest = setting("apk_sha256")
+            size = int(setting("apk_size", "0") or 0)
+
+        set_setting("latest_version", version)
+        set_setting("update_message", message or "A new version is available.")
+        set_setting("update_force", force)
+        set_setting("online_update", enabled)
+        set_setting("apk_filename", new_filename)
+        set_setting("apk_original_name", original_name)
+        set_setting("apk_sha256", digest)
+        set_setting("apk_size", str(size))
+        flash("Update settings published successfully.", "success")
+        return redirect(url_for("updates"))
+
+    filename = setting("apk_filename")
+    return render_template("updates.html",
+        latest_version=setting("latest_version", "1.0.0"),
+        update_message=setting("update_message"),
+        online_update=setting("online_update"),
+        force_update=setting("update_force"),
+        apk_name=setting("apk_original_name"),
+        apk_size=int(setting("apk_size", "0") or 0),
+        apk_sha256=setting("apk_sha256"),
+        download_url=url_for("download_latest_apk", filename=filename, _external=True) if filename else "")
 
 
 # ============================================================

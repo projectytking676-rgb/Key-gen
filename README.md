@@ -17,6 +17,7 @@ Set these in Railway → Service → Variables:
 - `KURO_ADMIN_USERNAME` = admin username (at least 3 chars)
 - `KURO_ADMIN_PASSWORD` = strong password (at least 12 chars)
 - `KURO_DB_PATH` = `/data/project_yt.db`
+- `KURO_UPLOAD_PATH` = `/data/uploads`
 
 Attach a Railway Volume mounted at `/data` to persist the SQLite database.
 
@@ -47,3 +48,11 @@ requires a push transport/provider and Android-side integration.
 This package has an `api_docs` Flask endpoint and the `base.html` navigation
 links to it. Deploy the complete package together; do not mix old templates
 with a different `app.py`.
+
+## APK update manager (added)
+- Admin page: `/updates` (login required). Upload an APK, set the version and message, and publish it.
+- Public download endpoint: `/updates/apk/<generated-filename>`; only the currently published APK is served.
+- Update check: `GET /api/v1/update?version=1.0.0` returns `update_available`, `force_update`, `latest_version`, `download_url` and `update_url`.
+- The API keeps `update_url` for compatibility with existing clients. When an APK is uploaded, it returns the server-generated APK download URL; otherwise it uses the manually configured external update URL.
+- Railway: mount a persistent Volume at `/data` and set `KURO_UPLOAD_PATH=/data/uploads`. The upload limit is 300 MB. APK uploads are stored on the server, and SHA-256 is shown in the admin page.
+- Android must download the APK, request the user to allow installs from that source when needed, then launch the Android package installer. Android does not allow an app to silently grant this permission or silently install an ordinary APK.
