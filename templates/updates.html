@@ -1,0 +1,18 @@
+{% extends "base.html" %}{% block title %}APK Updates · PROJECT YT{% endblock %}{% block content %}
+<div class="eyebrow">APP DISTRIBUTION</div>
+<div class="heading"><div><h1>APK Update Manager</h1><p class="muted">Upload the latest APK and publish it to your Android app.</p></div><span class="pill green">RAILWAY STORAGE</span></div>
+<section class="card">
+<form method="post" enctype="multipart/form-data">
+<input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+<div class="form-grid">
+<div><label>Latest version name</label><input name="latest_version" value="{{ latest_version }}" placeholder="1.2.0" required></div>
+<div><label>APK file (max 300 MB)</label><input type="file" name="apk_file" accept=".apk,application/vnd.android.package-archive"></div>
+<div class="full"><label>Update message</label><textarea name="update_message" rows="3">{{ update_message }}</textarea></div>
+<div class="full"><label class="check"><input type="checkbox" name="online_update" value="1" {{ 'checked' if online_update=='1' else '' }}> Enable update checks</label>
+<label class="check"><input type="checkbox" name="force_update" value="1" {{ 'checked' if force_update=='1' else '' }}> Force update (app should block until updated)</label></div>
+</div><button class="primary wide">Publish Update</button>
+</form></section>
+<section class="card"><div class="section-head"><h2>Published APK</h2>{% if download_url %}<span class="pill green">UPLOADED</span>{% else %}<span class="pill red">NO APK</span>{% endif %}</div>
+{% if download_url %}<p><b>{{ apk_name }}</b></p><p class="muted">{{ (apk_size / 1024 / 1024)|round(2) }} MB</p><p class="muted mono">SHA-256: {{ apk_sha256 }}</p><p><a class="button" href="{{ download_url }}" target="_blank">Download published APK</a></p>{% else %}<p class="muted">No APK uploaded yet. Select an APK above and publish.</p>{% endif %}
+<p class="muted">The APK is stored in the configured upload directory. On Railway, set <code>KURO_UPLOAD_PATH=/data/uploads</code> and mount a persistent Volume at <code>/data</code>.</p>
+</section>{% endblock %}
